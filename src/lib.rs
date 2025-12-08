@@ -98,6 +98,14 @@ pub fn build_extracted_pdf(doc: &Document, config: &Config) {
 
     let all_pages_length = new_doc.get_pages().len() as u32;
 
+//    for page in (end_range + 1..=all_pages_length).rev() {
+//        new_doc.delete_pages(&[page]);
+//    }
+//
+//    for page in (1..start_range).rev() {
+//        new_doc.delete_pages(&[page]);
+//    }
+
     let delete_page_vec: Vec<u32> = (1..start_range).chain((end_range + 1)..=all_pages_length).collect();
 
     new_doc.delete_pages(&delete_page_vec);
