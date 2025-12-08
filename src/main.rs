@@ -1,27 +1,20 @@
-use pdf_splitter::{Config, build_extracted_pdf, load_pdf};
+use pdf_splitter::{UserConfig, extract_pages};
 
-fn main() {
-    let config = Config::build();
-    match config {
-        Ok(_) => println!("Successfully built config"),
+#[tokio::main]
+async fn main() {
+    let config = match UserConfig::build() {
+        Ok(c) => {
+            println!("Successfully build config");
+            c
+        },
         Err(e) => {
             println!("Error with building config: {e}");
             std::process::exit(1);
         }
-    }
+    };
 
-    let config = config.unwrap();
-
-    match load_pdf(&config.path) {
-        Ok(doc) => {
-            let page_count = doc.get_pages().len();
-            println!("PDF loaded with {} pages", page_count);
-
-            build_extracted_pdf(&doc, &config);
-        },
-        Err(e) => {
-            eprintln!("Error with loading file: {}", e);
-        }
-    }
-
+    match extract_pages(&config).await {
+        Ok(_) => println!("Success!!"),
+        Err(e) => println!("Error: {e}")
+    };
 }

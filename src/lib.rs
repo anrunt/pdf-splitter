@@ -1,17 +1,15 @@
 use std::{error::Error, io::{self, Write}};
-use lopdf::Document;
-use std::fs::File;
-use std::io::BufReader;
-use std::path::Path;
+use pdfcat::config::{CompressionLevel, Config, OverwriteMode, PageRange, Metadata};
+use std::path::PathBuf;
 
-pub struct Config {
+pub struct UserConfig {
     pub path: String,
     pub start_range: u32,
     pub end_range: u32
 }
 
-impl Config {
-    pub fn build() -> Result<Config, Box<dyn Error>> {
+impl UserConfig {
+    pub fn build() -> Result<UserConfig, Box<dyn Error>> {
         let mut input: String = String::new();
 
         print!("Give start and end range separated by space: ");
@@ -53,7 +51,7 @@ impl Config {
 
         println!("Start_range: {}, end_range: {}, path: {}", start_range, end_range, path);
 
-        Ok(Config {start_range, end_range, path})
+        Ok(UserConfig {start_range, end_range, path})
     }
 }
 
@@ -82,36 +80,29 @@ pub fn parse_and_validate_filename(input: &str) -> Result<String, Box<dyn Error>
     Ok(path)
 }
 
-pub fn load_pdf<P: AsRef<Path>>(path: P) -> Result<Document, lopdf::Error> {
-    let file = File::open(path)?;
+pub async fn extract_pages(config: &UserConfig) -> Result<(), Box<dyn Error>> {
+    let page_range_string = format!("{}-{}", &config.start_range, &config.end_range); 
+    let page_range = PageRange::parse(&page_range_string)
+        .map_err(|e| format!("Failed to parse page range {}:{}", page_range_string, e))?;
 
-    let reader = BufReader::new(file);
+    let pdfcat_config = Config {
+        inputs: vec![PathBuf::from(&config.path)],
+        output: PathBuf::from("output.pdf"),
+        page_range: Some(page_range),
+        dry_run: false,
+        verbose: false,
+        overwrite_mode: OverwriteMode::Prompt,
+        quiet: false,
+        bookmarks: true,
+        compression: CompressionLevel::Standard,
+        metadata: Metadata::default(),
+        continue_on_error: false,
+        jobs: None,
+        rotation: None,
+    };
 
-    Document::load_from(reader)
-}
-
-pub fn build_extracted_pdf(doc: &Document, config: &Config) {
-    let mut new_doc = doc.clone();
-
-    let start_range = config.start_range;
-    let end_range = config.end_range;
-
-    let all_pages_length = new_doc.get_pages().len() as u32;
-
-//    for page in (end_range + 1..=all_pages_length).rev() {
-//        new_doc.delete_pages(&[page]);
-//    }
-//
-//    for page in (1..start_range).rev() {
-//        new_doc.delete_pages(&[page]);
-//    }
-
-    let delete_page_vec: Vec<u32> = (1..start_range).chain((end_range + 1)..=all_pages_length).collect();
-
-    new_doc.delete_pages(&delete_page_vec);
-
-    match new_doc.save("output.pdf") {
-        Ok(_) => println!("Successfully extracted pdf!"),
-        Err(e) => println!("Error with saving new pdf: {}" , e)
-    }
+    let (mut document, stats) = pdfcat::merge::merge_pdfs(&pdfcat_config).await?;
+    document.save(&pdfcat_config.output)?;
+    println!("Extracted {} pages", stats.total_pages);
+    Ok(())
 }
