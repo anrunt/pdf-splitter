@@ -1,5 +1,5 @@
 use std::{error::Error, io::{self, Write}};
-use pdfcat::config::{CompressionLevel, Config, OverwriteMode, PageRange, Metadata};
+use pdfcat::{config::{CompressionLevel, Config, Metadata, OverwriteMode, PageRange}, validation::Validator};
 use std::path::PathBuf;
 
 pub struct UserConfig {
@@ -36,6 +36,10 @@ impl UserConfig {
         if iter.next().is_some() {
             return Err("Too many arguments - expected exactly 2".into())
         };
+
+        if start_range == 0 || end_range == 0 {
+            return Err("Range has to be greater or equal to 1".into());
+        }
 
         if start_range > end_range {
             return Err("Start range can't be bigger than end range".into());
@@ -85,9 +89,30 @@ pub async fn extract_pages(config: &UserConfig) -> Result<(), Box<dyn Error>> {
     let page_range = PageRange::parse(&page_range_string)
         .map_err(|e| format!("Failed to parse page range {}:{}", page_range_string, e))?;
 
+    let validator = Validator::new();
+    let validation_result = validator.validate_file(&PathBuf::from(&config.path)).await?;
+
+    if config.end_range > validation_result.page_count as u32 {
+        return Err("End range exceeds number of pages".into());
+    }
+
+    if config.start_range > validation_result.page_count as u32 {
+        return Err("Start range exceeds number of pages".into());
+    }
+
+    let path_buf = PathBuf::from(&config.path);
+    let path_buf_name = path_buf.file_stem()
+        .ok_or("Can't get file name")?
+        .to_string_lossy();
+    let path_buf_extension = path_buf.extension()
+        .ok_or("Can't get file extension")?
+        .to_string_lossy();
+
+    let output_name = format!("{}-{}-{}.{}", path_buf_name, &config.start_range, &config.end_range, path_buf_extension);
+
     let pdfcat_config = Config {
         inputs: vec![PathBuf::from(&config.path)],
-        output: PathBuf::from("output.pdf"),
+        output: PathBuf::from(output_name),
         page_range: Some(page_range),
         dry_run: false,
         verbose: false,
