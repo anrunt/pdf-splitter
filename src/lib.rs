@@ -53,7 +53,7 @@ impl UserConfig {
 
         let path = parse_and_validate_filename(&input)?;
 
-        println!("Start_range: {}, end_range: {}, path: {}", start_range, end_range, path);
+//        println!("Start_range: {}, end_range: {}, path: {}", start_range, end_range, path);
 
         Ok(UserConfig {start_range, end_range, path})
     }

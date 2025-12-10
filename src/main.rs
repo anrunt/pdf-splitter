@@ -1,10 +1,9 @@
-use pdf_splitter::{UserConfig, extract_pages};
+use pdfsplit::{UserConfig, extract_pages};
 
 #[tokio::main]
 async fn main() {
     let config = match UserConfig::build() {
         Ok(c) => {
-            println!("Successfully build config");
             c
         },
         Err(e) => {
@@ -13,8 +12,7 @@ async fn main() {
         }
     };
 
-    match extract_pages(&config).await {
-        Ok(_) => println!("Success!!"),
-        Err(e) => println!("Error: {e}")
-    };
+    if let Err(e) = extract_pages(&config).await {
+        println!("Error: {e}");
+    }
 }
