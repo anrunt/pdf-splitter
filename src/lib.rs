@@ -10,6 +10,12 @@ pub struct UserConfig {
 
 impl UserConfig {
     pub fn build() -> Result<UserConfig, Box<dyn Error>> {
+        let path_arg = std::env::args()
+            .nth(1)
+            .ok_or("No file path provided. Usage: pdfsplit <pdf-filename>")?;
+
+        let path = parse_and_validate_filename(&path_arg)?;
+
         let mut input: String = String::new();
 
         print!("Give start and end range separated by space: ");
@@ -22,7 +28,6 @@ impl UserConfig {
 
         let mut iter = input.split_whitespace();
 
-        // Check if start_range is not bigger than end range
         let start_range: u32 = iter.next()
             .ok_or("Missing range argument (should be 2 only 1 provided)")?
             .parse()
@@ -47,12 +52,6 @@ impl UserConfig {
 
         input.clear();
 
-        print!("Give pdf filename: ");
-        io::stdout().flush()?;
-        io::stdin().read_line(&mut input)?;
-
-        let path = parse_and_validate_filename(&input)?;
-
 //        println!("Start_range: {}, end_range: {}, path: {}", start_range, end_range, path);
 
         Ok(UserConfig {start_range, end_range, path})
@@ -64,11 +63,11 @@ pub fn parse_and_validate_filename(input: &str) -> Result<String, Box<dyn Error>
     let path = Some(path_trimmed_string).filter(|p| !p.is_empty()).ok_or("Empty pdf name")?;
 
     if path.starts_with(".") {
-        return Err("Filename cant start with .".into());
+        return Err("Filename can't start with .".into());
     }
 
     if path.chars().any(|c| c == '/' || c == '\\' || c == '~' || c == ' ') {
-        return Err("Filename cant contain /\\~ and whitespaces".into());
+        return Err("Filename can't contain /\\~ and whitespaces".into());
     }
 
     let dot_count = path.chars().filter(|&c| c == '.').count();
@@ -101,9 +100,11 @@ pub async fn extract_pages(config: &UserConfig) -> Result<(), Box<dyn Error>> {
     }
 
     let path_buf = PathBuf::from(&config.path);
+
     let path_buf_name = path_buf.file_stem()
         .ok_or("Can't get file name")?
         .to_string_lossy();
+
     let path_buf_extension = path_buf.extension()
         .ok_or("Can't get file extension")?
         .to_string_lossy();
